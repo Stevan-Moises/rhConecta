@@ -1,367 +1,352 @@
-// --- DADOS INICIAIS ---
-// Adicionada propriedade 'ativo' para controle de status
+// --- 1. DADOS INICIAIS E ESTADO ---
+// Dados de exemplo caso não haja nada no localStorage
 let colaboradores = [
-    { id: 1, nome: 'Carlos Silva', matricula: '1001', filial: 'FL 02', dataAdmissao: '2023-01-15', cargo: 'Vendedor', statusCracha: 'Definitivo', registraPonto: true, ativo: true, assinaturas: { '2026-02': true } },
-    { id: 2, nome: 'Ana Souza', matricula: '1002', filial: 'FL 53', dataAdmissao: '2023-03-10', cargo: 'Gerente', statusCracha: 'Provisório', registraPonto: true, ativo: true, assinaturas: { '2026-02': true } },
-    { id: 3, nome: 'Roberto Lima', matricula: '1003', filial: 'FL 03', dataAdmissao: '2023-06-20', cargo: 'Supervisor', statusCracha: 'Sem Crachá', registraPonto: false, ativo: true, assinaturas: {} },
-    { id: 4, nome: 'Fernanda Costa', matricula: '1004', filial: 'FL 54', dataAdmissao: '2023-08-01', cargo: 'Caixa', statusCracha: 'Definitivo', registraPonto: true, ativo: true, assinaturas: { '2026-02': false } },
+    { id: 1, nome: 'Carlos Silva', matricula: '1001', filial: 'FL 02', dataAdmissao: '2023-01-15', cargo: 'Vendedor', statusCracha: 'Definitivo', registraPonto: true, situacao: 'Ativo', assinaturas: { '2026-02': true } },
+    { id: 2, nome: 'Ana Souza', matricula: '1002', filial: 'FL 53', dataAdmissao: '2023-03-10', cargo: 'Gerente', statusCracha: 'Provisório', registraPonto: true, situacao: 'Ativo', assinaturas: { '2026-02': true } }
 ];
 
-// --- ESTADO DA APLICAÇÃO ---
+// Estado que controla o que é exibido na tela
 let estadoApp = {
-    abaAtiva: 'colaboradores',
-    mesAtual: new Date().toISOString().slice(0, 7),
-    filtroPonto: 'Todos'
+    abaAtiva: 'colaboradores', // 'colaboradores' ou 'ponto'
+    mesAtual: new Date().toISOString().slice(0, 7), // AAAA-MM
+    filtroPonto: 'Todos' // 'Todos', 'Assinado', 'Pendente'
 };
 
-// --- INICIALIZAÇÃO ---
+let timeoutBusca = null; // Para otimizar a barra de pesquisa
+
+// --- 2. INICIALIZAÇÃO ---
 document.addEventListener('DOMContentLoaded', () => {
-    carregarDoArmazenamento(); // Carrega dados do localStorage
-    lucide.createIcons();
-    renderizarApp();
+    carregarDoArmazenamento(); // Busca dados salvos
+    inicializarTema();         // Configura o tema Inicial (Light/Dark)
+    if (window.lucide) window.lucide.createIcons();
+    renderizarApp();           // Desenha a tela inicial
     document.getElementById('inputArquivo').addEventListener('change', processarImportacaoArquivo);
 });
 
-/* --- PERSISTÊNCIA DE DADOS (LOCALSTORAGE) --- */
+// --- 3. PERSISTÊNCIA (LOCALSTORAGE) ---
 function salvarNoArmazenamento() {
     try {
-        localStorage.setItem('rhConectaDados', JSON.stringify(colaboradores));
-    } catch (e) {
-        console.error("Erro ao salvar dados localmente:", e);
-    }
+        localStorage.setItem('rhConectaDadosV4', JSON.stringify(colaboradores));
+    } catch (e) { console.error("Erro ao salvar:", e); }
 }
 
 function carregarDoArmazenamento() {
     try {
-        const dadosSalvos = localStorage.getItem('rhConectaDados');
-        if (dadosSalvos) {
-            colaboradores = JSON.parse(dadosSalvos);
+        const dadosV4 = localStorage.getItem('rhConectaDadosV4');
+        if (dadosV4) {
+            colaboradores = JSON.parse(dadosV4);
+            return;
         }
-    } catch (e) {
-        console.error("Erro ao carregar dados locais:", e);
+    } catch (e) { console.error("Erro ao carregar:", e); }
+}
+
+// --- 4. CONTROLE DE TEMA (DARK MODE) ---
+function inicializarTema() {
+    // Verifica se já havia um tema selecionado ou se o sistema do utilizador usa dark mode nativo
+    if (localStorage.getItem('tema') === 'dark' || (!('tema' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+        atualizarIconeTema('dark');
+    } else {
+        document.documentElement.classList.remove('dark');
+        atualizarIconeTema('light');
     }
 }
 
-/* --- FUNÇÕES DE INTERFACE --- */
-function alternarBarraLateral() {
-    const barraLateral = document.getElementById('barraLateral');
-    const overlay = document.getElementById('overlayMovel');
-    const estaFechado = barraLateral.classList.contains('-translate-x-full');
+function alternarTema() {
+    if (document.documentElement.classList.contains('dark')) {
+        document.documentElement.classList.remove('dark');
+        localStorage.setItem('tema', 'light');
+        atualizarIconeTema('light');
+    } else {
+        document.documentElement.classList.add('dark');
+        localStorage.setItem('tema', 'dark');
+        atualizarIconeTema('dark');
+    }
+}
 
-    if (estaFechado) {
-        barraLateral.classList.remove('-translate-x-full');
+function atualizarIconeTema(temaAtual) {
+    const icones = document.querySelectorAll('.icone-tema');
+    const textos = document.querySelectorAll('.texto-tema');
+
+    icones.forEach(i => i.setAttribute('data-lucide', temaAtual === 'dark' ? 'sun' : 'moon'));
+    textos.forEach(t => t.innerText = temaAtual === 'dark' ? 'Modo Claro' : 'Modo Escuro');
+
+    if (window.lucide) window.lucide.createIcons();
+}
+
+// --- 5. INTERFACE E NAVEGAÇÃO ---
+
+// Atrasa a busca para não travar a tela enquanto digita (Debounce)
+function debounceBusca() {
+    clearTimeout(timeoutBusca);
+    timeoutBusca = setTimeout(() => { renderizarApp(); }, 200);
+}
+
+// Abre/Fecha o menu lateral no telemóvel
+function alternarBarraLateral() {
+    const el = document.getElementById('barraLateral');
+    const overlay = document.getElementById('overlayMovel');
+    if (el.classList.contains('-translate-x-full')) {
+        el.classList.remove('-translate-x-full');
         overlay.classList.remove('hidden');
         setTimeout(() => overlay.classList.remove('opacity-0'), 10);
     } else {
-        barraLateral.classList.add('-translate-x-full');
+        el.classList.add('-translate-x-full');
         overlay.classList.add('opacity-0');
         setTimeout(() => overlay.classList.add('hidden'), 300);
     }
 }
+function alternarBarraLateralMovel() { if (window.innerWidth < 768) alternarBarraLateral(); }
 
-function alternarBarraLateralMovel() {
-    if (window.innerWidth < 768) alternarBarraLateral();
-}
+// Troca as abas e atualiza títulos
+function alternarAba(aba) {
+    estadoApp.abaAtiva = aba;
+    document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active', 'bg-slate-800'));
+    document.getElementById(`nav-${aba}`).classList.add('active');
 
-function alternarAba(nomeAba) {
-    estadoApp.abaAtiva = nomeAba;
-    document.querySelectorAll('.sidebar-link').forEach(el => {
-        el.classList.remove('active');
-        el.querySelector('span').classList.remove('text-indigo-500');
-    });
-    document.getElementById(`nav-${nomeAba}`).classList.add('active');
-
-    const titulo = document.getElementById('tituloPagina');
-    const subtitulo = document.getElementById('subtituloPagina');
-
-    if (nomeAba === 'colaboradores') {
-        titulo.textContent = 'Gestão de Colaboradores';
-        subtitulo.textContent = 'Gerencie o quadro de funcionários das filiais.';
-    } else {
-        titulo.textContent = 'Controle de Ponto';
-        subtitulo.textContent = 'Acompanhe as assinaturas de espelho de ponto mensais.';
-    }
+    const titulos = { colaboradores: ['Gestão de Colaboradores', 'Gerencie o quadro de funcionários.'], ponto: ['Controle de Ponto', 'Acompanhe as assinaturas mensais.'] };
+    document.getElementById('tituloPagina').innerText = titulos[aba][0];
+    document.getElementById('subtituloPagina').innerText = titulos[aba][1];
     renderizarApp();
 }
 
-/* --- RENDERIZAÇÃO --- */
+// --- 6. RENDERIZAÇÃO DA APLICAÇÃO ---
+// Função principal: Controla o que aparece na tela baseado nos filtros
 function renderizarApp() {
-    const termoBusca = document.getElementById('campoBusca').value.toLowerCase();
-    const filtroFilial = document.getElementById('filtroFilial').value;
-    const filtroCracha = document.getElementById('filtroCracha').value;
-    const filtroSituacao = document.getElementById('filtroSituacao').value; // Novo Filtro
+    const busca = document.getElementById('campoBusca').value.toLowerCase();
+    const fFilial = document.getElementById('filtroFilial').value;
+    const fSituacao = document.getElementById('filtroSituacao').value;
+    const fCracha = document.getElementById('filtroCracha').value;
     const divConteudo = document.getElementById('conteudoApp');
-    const divAcoesCabecalho = document.getElementById('acoesCabecalho');
+    const divAcoes = document.getElementById('acoesCabecalho');
 
+    // Renderiza botão de ação no topo (Adicionar ou Mês)
     if (estadoApp.abaAtiva === 'colaboradores') {
-        divAcoesCabecalho.innerHTML = `
-                    <button onclick="abrirModalFormulario()" class="btn-hover flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-all shadow-md shadow-indigo-200 active:scale-95 transform">
-                        <i data-lucide="plus" class="w-4 h-4"></i> Novo Colaborador
-                    </button>`;
+        divAcoes.innerHTML = `<button onclick="abrirModalFormulario()" class="btn-hover flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-all shadow-md active:scale-95 transform"><i data-lucide="plus" class="w-4 h-4"></i> Novo Colaborador</button>`;
     } else {
-        divAcoesCabecalho.innerHTML = `
-                    <div class="flex items-center gap-3 bg-white p-1 pr-4 rounded-lg border border-slate-200 shadow-sm transition-shadow hover:shadow-md">
-                        <div class="bg-slate-100 p-2 rounded text-slate-500"><i data-lucide="calendar" class="w-4 h-4"></i></div>
-                        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Mês:</span>
-                        <input type="month" value="${estadoApp.mesAtual}" onchange="alterarMes(this.value)" class="border-none bg-transparent text-sm font-semibold text-slate-700 focus:ring-0 cursor-pointer p-0">
-                    </div>`;
+        divAcoes.innerHTML = `<div class="flex items-center gap-3 bg-white dark:bg-slate-800 p-1 pr-4 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm transition-colors"><div class="bg-slate-100 dark:bg-slate-700 p-2 rounded text-slate-500 dark:text-slate-400"><i data-lucide="calendar" class="w-4 h-4"></i></div><input type="month" value="${estadoApp.mesAtual}" onchange="alterarMes(this.value)" class="border-none bg-transparent text-sm font-semibold text-slate-700 dark:text-slate-200 focus:ring-0 cursor-pointer p-0 outline-none style-color-scheme"></div>`;
     }
 
-    let dadosFiltrados = colaboradores.filter(c => {
-        const coincideBusca = c.nome.toLowerCase().includes(termoBusca) || c.matricula.includes(termoBusca);
-        const coincideFilial = filtroFilial === 'Todas' || c.filial === filtroFilial;
-        const coincideCracha = filtroCracha === 'Todos' || c.statusCracha === filtroCracha;
-
-        // Lógica do filtro de situação
-        let coincideSituacao = true;
-        if (filtroSituacao === 'Ativos') coincideSituacao = c.ativo === true;
-        if (filtroSituacao === 'Desligados') coincideSituacao = c.ativo === false;
-
-        return coincideBusca && coincideFilial && coincideCracha && coincideSituacao;
+    // Filtra os dados com segurança
+    let filtrados = colaboradores.filter(c => {
+        const nomeSeguro = (c.nome || '').toLowerCase();
+        const matriculaSegura = (c.matricula || '');
+        const matchBusca = nomeSeguro.includes(busca) || matriculaSegura.includes(busca);
+        const matchFilial = fFilial === 'Todas' || c.filial === fFilial;
+        const matchSituacao = fSituacao === 'Todos' || c.situacao === fSituacao;
+        const matchCracha = fCracha === 'Todos' || c.statusCracha === fCracha;
+        return matchBusca && matchFilial && matchSituacao && matchCracha;
     });
 
+    // Decide qual tabela mostrar
     if (estadoApp.abaAtiva === 'colaboradores') {
-        renderizarTabelaColaboradores(dadosFiltrados, divConteudo);
+        renderizarTabela(filtrados, divConteudo);
     } else {
-        // Na aba de ponto, mostramos apenas quem registra ponto
-        let dadosPonto = dadosFiltrados.filter(c => c.registraPonto);
-
+        let dadosPonto = filtrados.filter(c => c.registraPonto);
         if (estadoApp.filtroPonto !== 'Todos') {
             dadosPonto = dadosPonto.filter(c => {
-                const assinado = c.assinaturas && c.assinaturas[estadoApp.mesAtual];
-                return estadoApp.filtroPonto === 'Assinado' ? assinado : !assinado;
+                const assinou = c.assinaturas && c.assinaturas[estadoApp.mesAtual];
+                return estadoApp.filtroPonto === 'Assinado' ? assinou : !assinou;
             });
         }
-        renderizarVisaoPonto(dadosPonto, divConteudo);
+        renderizarPonto(dadosPonto, divConteudo);
     }
-    lucide.createIcons();
+    if (window.lucide) window.lucide.createIcons();
 }
 
-function renderizarTabelaColaboradores(dados, container) {
+// --- 7. COMPONENTES VISUAIS ---
+
+// Gera HTML da Tabela de Colaboradores
+function renderizarTabela(dados, container) {
     if (dados.length === 0) {
-        container.innerHTML = `
-                    <div class="flex flex-col items-center justify-center py-16 bg-white rounded-2xl border border-dashed border-slate-300 stagger-enter">
-                        <div class="bg-slate-50 p-4 rounded-full mb-3"><i data-lucide="search-x" class="w-8 h-8 text-slate-400"></i></div>
-                        <h3 class="text-lg font-medium text-slate-900">Nenhum resultado encontrado</h3>
-                        <p class="text-slate-500 text-sm mt-1">Tente ajustar seus filtros.</p>
-                    </div>`;
+        container.innerHTML = `<div class="flex flex-col items-center justify-center py-16 bg-white dark:bg-slate-800 rounded-2xl border border-dashed border-slate-300 dark:border-slate-600 transition-colors"><div class="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-full mb-3"><i data-lucide="search-x" class="w-8 h-8 text-slate-400 dark:text-slate-500"></i></div><h3 class="text-lg font-medium text-slate-900 dark:text-slate-100">Nenhum resultado</h3><p class="text-slate-500 dark:text-slate-400 text-sm">Tente ajustar seus filtros.</p></div>`;
         return;
     }
 
-    const linhas = dados.map((c, index) => {
-        const partesData = c.dataAdmissao.split('-');
-        const dataFormatada = `${partesData[2]}/${partesData[1]}/${partesData[0]}`;
+    const linhas = dados.map(c => {
+        const dataFormatada = c.dataAdmissao ? c.dataAdmissao.split('-').reverse().join('/') : '--';
 
-        let classeBadge = 'bg-slate-100 text-slate-600 border-slate-200';
-        if (c.statusCracha === 'Definitivo') classeBadge = 'bg-emerald-50 text-emerald-700 border-emerald-100';
-        if (c.statusCracha === 'Provisório') classeBadge = 'bg-amber-50 text-amber-700 border-amber-100';
-        if (c.statusCracha === 'Sem Crachá') classeBadge = 'bg-rose-50 text-rose-700 border-rose-100';
+        // Cores Dinâmicas de Badge Suportando Dark Mode
+        let badgeClass = 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600';
+        if (c.statusCracha === 'Definitivo') badgeClass = 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-500/20';
+        else if (c.statusCracha === 'Provisório') badgeClass = 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-500/20';
+        else if (c.statusCracha === 'Sem Crachá') badgeClass = 'bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-100 dark:border-rose-500/20';
+        else if (c.statusCracha === 'Crachá Quebrado') badgeClass = 'bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-100 dark:border-orange-500/20';
+        else if (c.statusCracha === 'Outra Via') badgeClass = 'bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-100 dark:border-violet-500/20';
 
-        // Se desligado, aplica estilo visual diferenciado
-        const classeLinha = c.ativo ? 'row-hover bg-white' : 'row-desligado';
-        const iconeAcao = c.ativo ? 'power' : 'refresh-cw'; // Ícone muda dependendo do estado
-        const tituloAcao = c.ativo ? 'Desligar Colaborador' : 'Reativar Colaborador';
-        const corBotaoAcao = c.ativo ? 'text-rose-500 hover:bg-rose-50' : 'text-emerald-500 hover:bg-emerald-50';
+        let rowClass = 'bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50';
+        let iconeAcao = 'power';
+        let tituloAcao = 'Desligar Colaborador';
+        let corAcao = 'text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-500/20';
+
+        if (c.situacao === 'Desligado') {
+            rowClass = 'row-desligado';
+            iconeAcao = 'refresh-cw';
+            tituloAcao = 'Reativar Colaborador';
+            corAcao = 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/20';
+        } else if (c.situacao === 'Afastado') {
+            rowClass = 'row-afastado dark:bg-amber-900/10 dark:hover:bg-amber-900/20';
+        }
 
         return `
-                    <tr class="${classeLinha} transition-all-custom border-b border-slate-100 last:border-0 group">
-                        <td class="px-6 py-4">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 shrink-0 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-sm border border-indigo-200 transition-transform duration-200 group-hover:scale-110">${c.nome.charAt(0)}</div>
-                                <div><span class="block font-medium text-slate-900 group-hover:text-indigo-600 transition-colors">${c.nome}</span><span class="block text-xs text-slate-500 font-mono">MAT: ${c.matricula}</span></div>
-                            </div>
-                        </td>
-                        <td class="px-6 py-4"><div class="flex flex-col"><span class="text-sm font-medium text-slate-700">${c.filial}</span><span class="text-xs text-slate-500">${c.cargo}</span></div></td>
-                        <td class="px-6 py-4 hidden sm:table-cell"><div class="flex items-center gap-2 text-sm text-slate-600"><i data-lucide="calendar-days" class="w-4 h-4 text-slate-400"></i> ${dataFormatada}</div></td>
-                        <td class="px-6 py-4"><span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${classeBadge} transition-transform duration-200 group-hover:scale-105"><span class="w-1.5 h-1.5 rounded-full bg-current opacity-60"></span> ${c.statusCracha}</span></td>
-                        <td class="px-6 py-4 text-right">
-                            <div class="flex items-center justify-end gap-1 opacity-100 sm:opacity-80 sm:group-hover:opacity-100 transition-opacity">
-                                <button onclick="abrirModalFormulario(${c.id})" class="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all active:scale-95" title="Editar"><i data-lucide="pencil" class="w-4 h-4"></i></button>
-                                <button onclick="abrirModalDesligamento(${c.id})" class="p-2 ${corBotaoAcao} rounded-lg transition-all active:scale-95" title="${tituloAcao}"><i data-lucide="${iconeAcao}" class="w-4 h-4"></i></button>
-                            </div>
-                        </td>
-                    </tr>`;
+                <tr class="${rowClass} transition-colors border-b border-slate-100 dark:border-slate-700 last:border-0 group">
+                    <td class="px-6 py-4 flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-indigo-50 dark:bg-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold text-sm border border-indigo-200 dark:border-indigo-500/30">${c.nome.charAt(0)}</div>
+                        <div>
+                            <span class="block font-medium text-slate-900 dark:text-slate-100">${c.nome}</span>
+                            <span class="block text-xs text-slate-500 dark:text-slate-400">MAT: ${c.matricula}</span>
+                            ${c.situacao === 'Afastado' ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 mt-1">Afastado</span>' : ''}
+                        </div>
+                    </td>
+                    <td class="px-6 py-4"><span class="text-sm font-medium text-slate-700 dark:text-slate-300">${c.filial}</span><br><span class="text-xs text-slate-500 dark:text-slate-400">${c.cargo}</span></td>
+                    <td class="px-6 py-4 hidden sm:table-cell"><div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400"><i data-lucide="calendar" class="w-4 h-4 text-slate-400"></i> ${dataFormatada}</div></td>
+                    <td class="px-6 py-4"><span class="px-2.5 py-1 rounded-full text-xs font-semibold border ${badgeClass}">${c.statusCracha}</span></td>
+                    <td class="px-6 py-4 text-right">
+                        <div class="flex items-center justify-end gap-1 opacity-100 sm:opacity-80 sm:group-hover:opacity-100 transition-opacity">
+                            <button onclick="abrirModalFormulario(${c.id})" class="p-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/20 rounded-lg transition-all active:scale-95" title="Editar Informações"><i data-lucide="pencil" class="w-4 h-4"></i></button>
+                            <button onclick="abrirModalDesligamento(${c.id})" class="p-2 ${corAcao} rounded-lg transition-all active:scale-95" title="${tituloAcao}"><i data-lucide="${iconeAcao}" class="w-4 h-4"></i></button>
+                            <!-- Botão de Exclusão Definitiva -->
+                            <button onclick="abrirModalExclusaoPermanente(${c.id})" class="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/20 rounded-lg transition-all active:scale-95" title="Excluir Permanentemente"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </div>
+                    </td>
+                </tr>`;
     }).join('');
 
-    container.innerHTML = `
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden transition-shadow hover:shadow-md">
-                    <div class="overflow-x-auto"><table class="w-full text-left border-collapse">
-                        <thead><tr class="bg-slate-50 border-b border-slate-200">
-                            <th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Colaborador</th>
-                            <th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Filial / Cargo</th>
-                            <th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase hidden sm:table-cell">Admissão</th>
-                            <th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Status Crachá</th>
-                            <th class="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase">Ações</th>
-                        </tr></thead>
-                        <tbody>${linhas}</tbody>
-                    </table></div>
-                    <div class="px-6 py-3 border-t border-slate-200 bg-slate-50 flex justify-between items-center"><span class="text-xs text-slate-500 font-medium">Mostrando <strong>${dados.length}</strong> registros</span></div>
-                </div>`;
+    container.innerHTML = `<div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden transition-colors"><div class="overflow-x-auto"><table class="w-full text-left border-collapse"><thead><tr class="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700"><th class="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Colaborador</th><th class="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Filial / Cargo</th><th class="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase hidden sm:table-cell">Admissão</th><th class="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Status Crachá</th><th class="px-6 py-4 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Ações</th></tr></thead><tbody>${linhas}</tbody></table></div><div class="px-6 py-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center"><span class="text-xs text-slate-500 dark:text-slate-400 font-medium">Total: <strong class="text-slate-700 dark:text-slate-200">${dados.length}</strong></span></div></div>`;
 }
 
-function renderizarVisaoPonto(dados, container) {
-    const mesChave = estadoApp.mesAtual;
+function renderizarPonto(dados, container) {
+    const mes = estadoApp.mesAtual;
     const total = dados.length;
-    const assinados = dados.filter(c => c.assinaturas && c.assinaturas[mesChave]).length;
+    const assinados = dados.filter(c => c.assinaturas && c.assinaturas[mes]).length;
     const pendentes = total - assinados;
-    const porcentagem = total === 0 ? 0 : Math.round((assinados / total) * 100);
+    const pct = total === 0 ? 0 : Math.round((assinados / total) * 100);
 
-    const listaItens = dados.length === 0
-        ? `<div class="p-12 text-center text-slate-500 stagger-enter">Nenhum colaborador elegível.</div>`
-        : dados.map((c, index) => {
-            const estaAssinado = c.assinaturas && c.assinaturas[mesChave];
-            return `
-                        <div class="p-4 flex flex-col sm:flex-row sm:items-center justify-between hover:bg-slate-50 transition-colors duration-200 border-b border-slate-100 last:border-0 group gap-4">
-                            <div class="flex items-center gap-4">
-                                <div class="w-10 h-10 shrink-0 rounded-full flex items-center justify-center font-bold text-sm shadow-sm border transition-transform duration-200 group-hover:scale-110 ${estaAssinado ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-100'}">${c.nome.charAt(0)}</div>
-                                <div><h3 class="text-sm font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors">${c.nome}</h3><div class="flex items-center gap-2 text-xs text-slate-500 mt-0.5"><span class="bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-mono">${c.filial}</span><span>•</span><span>MAT: ${c.matricula}</span></div></div>
-                            </div>
-                            <div class="flex items-center justify-between sm:justify-end gap-6 w-full sm:w-auto pl-14 sm:pl-0">
-                                <div class="flex items-center gap-2"><span class="text-xs font-medium ${estaAssinado ? 'text-emerald-700' : 'text-rose-700'}">${estaAssinado ? 'Assinado' : 'Pendente'}</span></div>
-                                <label class="relative inline-flex items-center cursor-pointer">
-                                    <input type="checkbox" class="sr-only peer" ${estaAssinado ? 'checked' : ''} onchange="alternarAssinatura(${c.id})">
-                                    <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 transition-colors duration-300"></div>
-                                </label>
-                            </div>
-                        </div>`;
-        }).join('');
+    const lista = dados.map(c => {
+        const assinou = c.assinaturas && c.assinaturas[mes];
+        let rowStyle = 'bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50';
+        let badge = '';
+
+        if (c.situacao === 'Desligado') {
+            rowStyle = 'row-desligado';
+            badge = '<span class="ml-2 px-1.5 py-0.5 rounded text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">Desligado</span>';
+        }
+        else if (c.situacao === 'Afastado') {
+            rowStyle = 'row-afastado dark:bg-amber-900/10 dark:hover:bg-amber-900/20';
+            badge = '<span class="ml-2 px-1.5 py-0.5 rounded text-[10px] bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300">Afastado</span>';
+        }
+
+        return `<div class="p-4 flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 dark:border-slate-700 last:border-0 gap-4 ${rowStyle} transition-colors">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shadow-sm border ${assinou ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-500/20' : 'bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-100 dark:border-rose-500/20'}">${c.nome.charAt(0)}</div>
+                        <div><h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center">${c.nome} ${badge}</h3><div class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-0.5"><span class="bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded font-mono">${c.filial}</span><span>• MAT: ${c.matricula}</span></div></div>
+                    </div>
+                    <div class="flex items-center justify-between sm:justify-end gap-6 w-full sm:w-auto pl-14 sm:pl-0">
+                        <span class="text-xs font-medium w-24 text-right ${assinou ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'}">${assinou ? 'Assinado' : 'Pendente'}</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" class="sr-only peer" ${assinou ? 'checked' : ''} onchange="alternarAssinatura(${c.id})">
+                            <div class="w-11 h-6 bg-slate-200 dark:bg-slate-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                        </label>
+                    </div>
+                </div>`;
+    }).join('');
 
     container.innerHTML = `
                 <div class="space-y-6">
                     <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 relative overflow-hidden">
-                            <div class="absolute right-0 top-0 h-full w-1 bg-indigo-600"></div>
-                            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Total</p>
-                            <div class="flex items-end justify-between"><h3 class="text-2xl font-bold text-slate-800">${total}</h3><i data-lucide="users" class="w-5 h-5 text-indigo-500"></i></div>
-                        </div>
-                        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 relative overflow-hidden">
-                            <div class="absolute right-0 top-0 h-full w-1 bg-emerald-500"></div>
-                            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Assinados</p>
-                            <div class="flex items-end justify-between"><h3 class="text-2xl font-bold text-slate-800">${assinados}</h3><i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-500"></i></div>
-                        </div>
-                        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 relative overflow-hidden">
-                            <div class="absolute right-0 top-0 h-full w-1 bg-rose-500"></div>
-                            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Pendentes</p>
-                            <div class="flex items-end justify-between"><h3 class="text-2xl font-bold text-slate-800">${pendentes}</h3><i data-lucide="alert-circle" class="w-5 h-5 text-rose-500"></i></div>
-                        </div>
-                        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-center">
-                            <div class="flex justify-between items-end mb-2"><span class="text-xs font-bold text-slate-500">Progresso</span><span class="text-sm font-bold text-indigo-600">${porcentagem}%</span></div>
-                            <div class="w-full bg-slate-100 rounded-full h-2"><div class="bg-indigo-600 h-2 rounded-full transition-all duration-1000 ease-out" style="width: ${porcentagem}%"></div></div>
-                        </div>
+                        <div class="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative overflow-hidden transition-colors"><div class="absolute right-0 top-0 h-full w-1 bg-indigo-600"></div><p class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase">Total</p><div class="flex justify-between items-end"><h3 class="text-2xl font-bold text-slate-800 dark:text-slate-100">${total}</h3><i data-lucide="users" class="w-5 h-5 text-indigo-500"></i></div></div>
+                        <div class="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative overflow-hidden transition-colors"><div class="absolute right-0 top-0 h-full w-1 bg-emerald-500"></div><p class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase">Assinados</p><div class="flex justify-between items-end"><h3 class="text-2xl font-bold text-slate-800 dark:text-slate-100">${assinados}</h3><i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-500"></i></div></div>
+                        <div class="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative overflow-hidden transition-colors"><div class="absolute right-0 top-0 h-full w-1 bg-rose-500"></div><p class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase">Pendentes</p><div class="flex justify-between items-end"><h3 class="text-2xl font-bold text-slate-800 dark:text-slate-100">${pendentes}</h3><i data-lucide="alert-circle" class="w-5 h-5 text-rose-500"></i></div></div>
+                        <div class="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 transition-colors"><div class="flex justify-between mb-2"><span class="text-xs font-bold text-slate-500 dark:text-slate-400">Progresso</span><span class="text-sm font-bold text-indigo-600 dark:text-indigo-400">${pct}%</span></div><div class="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2"><div class="bg-indigo-600 dark:bg-indigo-500 h-2 rounded-full transition-all duration-1000" style="width: ${pct}%"></div></div></div>
                     </div>
-                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                        <div class="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between bg-slate-50/50 gap-4">
-                            <h3 class="font-semibold text-slate-700">Lista de Assinaturas</h3>
-                            <div class="flex bg-slate-100 p-1 rounded-lg w-full sm:w-auto">
-                                ${['Todos', 'Assinado', 'Pendente'].map(f => `<button onclick="definirFiltroPonto('${f}')" class="flex-1 sm:flex-none px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 ${estadoApp.filtroPonto === f ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}">${f}</button>`).join('')}
-                            </div>
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden transition-colors">
+                        <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between bg-slate-50/50 dark:bg-slate-900/50 gap-4">
+                            <h3 class="font-semibold text-slate-700 dark:text-slate-200">Lista de Assinaturas</h3>
+                            <div class="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-lg w-full sm:w-auto">${['Todos', 'Assinado', 'Pendente'].map(f => `<button onclick="definirFiltroPonto('${f}')" class="flex-1 sm:flex-none px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 ${estadoApp.filtroPonto === f ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}">${f}</button>`).join('')}</div>
                         </div>
-                        <div class="divide-y divide-slate-100">${listaItens}</div>
+                        <div class="divide-y divide-slate-100 dark:divide-slate-700">${lista}</div>
                     </div>
                 </div>`;
 }
 
-/* --- LÓGICA DE NEGÓCIO --- */
-
-function alterarMes(novoMes) {
-    estadoApp.mesAtual = novoMes;
-    renderizarApp();
-}
-
-function definirFiltroPonto(filtro) {
-    estadoApp.filtroPonto = filtro;
-    renderizarApp();
-}
+// --- 8. LÓGICA DE AÇÕES E MODAIS ---
+function alterarMes(m) { estadoApp.mesAtual = m; renderizarApp(); }
+function definirFiltroPonto(f) { estadoApp.filtroPonto = f; renderizarApp(); }
 
 function alternarAssinatura(id) {
-    const colab = colaboradores.find(c => c.id === id);
-    if (colab) {
-        if (!colab.assinaturas) colab.assinaturas = {};
-        const atual = colab.assinaturas[estadoApp.mesAtual] || false;
-        colab.assinaturas[estadoApp.mesAtual] = !atual;
-        salvarNoArmazenamento(); // Salva após alterar
+    const c = colaboradores.find(x => x.id === id);
+    if (c) {
+        if (!c.assinaturas) c.assinaturas = {};
+        c.assinaturas[estadoApp.mesAtual] = !c.assinaturas[estadoApp.mesAtual];
+        salvarNoArmazenamento();
         renderizarApp();
     }
 }
 
-/* --- MODAIS E FORMULÁRIOS --- */
-
 function abrirModalFormulario(id = null) {
     const modal = document.getElementById('modalFormulario');
-    const conteudoModal = document.getElementById('conteudoModalFormulario');
-    const titulo = document.getElementById('tituloModal');
-
+    const conteudo = document.getElementById('conteudoModalFormulario');
     document.getElementById('formularioColaborador').reset();
     document.getElementById('colaboradorId').value = '';
+    document.getElementById('colabSituacao').value = 'Ativo';
+    document.getElementById('tituloModal').innerText = 'Novo Registro';
 
     if (id) {
-        const colab = colaboradores.find(c => c.id === id);
-        if (colab) {
-            titulo.textContent = 'Editar Registro';
-            document.getElementById('colaboradorId').value = colab.id;
-            document.getElementById('colabNome').value = colab.nome;
-            document.getElementById('colabMatricula').value = colab.matricula;
-            document.getElementById('colabFilial').value = colab.filial;
-            document.getElementById('colabDataAdmissao').value = colab.dataAdmissao;
-            document.getElementById('colabCargo').value = colab.cargo;
-            document.getElementById('colabCracha').value = colab.statusCracha;
-            document.getElementById('colabRegistraPonto').checked = colab.registraPonto;
+        const c = colaboradores.find(x => x.id === id);
+        if (c) {
+            document.getElementById('tituloModal').innerText = 'Editar Registro';
+            document.getElementById('colaboradorId').value = c.id;
+            document.getElementById('colabNome').value = c.nome;
+            document.getElementById('colabMatricula').value = c.matricula;
+            document.getElementById('colabFilial').value = c.filial;
+            document.getElementById('colabDataAdmissao').value = c.dataAdmissao;
+            document.getElementById('colabCargo').value = c.cargo;
+            document.getElementById('colabCracha').value = c.statusCracha;
+            document.getElementById('colabSituacao').value = c.situacao;
+            document.getElementById('colabRegistraPonto').checked = c.registraPonto;
         }
-    } else {
-        titulo.textContent = 'Novo Colaborador';
     }
-
     modal.classList.remove('hidden');
-    setTimeout(() => {
-        modal.classList.remove('opacity-0');
-        conteudoModal.classList.remove('opacity-0', 'scale-95');
-        conteudoModal.classList.add('scale-100');
-    }, 10);
+    setTimeout(() => { modal.classList.remove('opacity-0'); conteudo.classList.remove('opacity-0', 'scale-95'); conteudo.classList.add('scale-100'); }, 10);
 }
 
 function abrirModalDesligamento(id) {
-    const colab = colaboradores.find(c => c.id === id);
-    if (!colab) return;
+    const c = colaboradores.find(x => x.id === id);
+    if (!c) return;
+    document.getElementById('idAlvoDesligamento').value = id;
+    document.getElementById('tituloModalDesligamento').innerText = c.situacao === 'Desligado' ? 'Reativar Colaborador?' : 'Confirmar Alteração';
+    document.getElementById('nomeAlvoDesligamento').innerText = c.nome;
 
     const modal = document.getElementById('modalDesligamento');
-    const conteudoModal = document.getElementById('conteudoModalDesligamento');
-    const tituloModal = document.getElementById('tituloModalDesligamento');
-
-    // Lógica dinâmica: Se já estiver inativo, pergunta se quer reativar
-    if (colab.ativo) {
-        tituloModal.textContent = "Confirmar Desligamento";
-    } else {
-        tituloModal.textContent = "Reativar Colaborador?";
-    }
-
-    document.getElementById('idAlvoDesligamento').value = id;
-    document.getElementById('nomeAlvoDesligamento').textContent = colab.nome;
-
+    const conteudo = document.getElementById('conteudoModalDesligamento');
     modal.classList.remove('hidden');
-    setTimeout(() => {
-        modal.classList.remove('opacity-0');
-        conteudoModal.classList.remove('opacity-0', 'scale-95');
-        conteudoModal.classList.add('scale-100');
-    }, 10);
+    setTimeout(() => { modal.classList.remove('opacity-0'); conteudo.classList.remove('opacity-0', 'scale-95'); conteudo.classList.add('scale-100'); }, 10);
 }
 
-function fecharModal(idModal) {
-    const modal = document.getElementById(idModal);
-    const conteudoModal = modal.querySelector('div');
+function abrirModalExclusaoPermanente(id) {
+    const c = colaboradores.find(x => x.id === id);
+    if (!c) return;
+    document.getElementById('idAlvoExclusao').value = id;
+    document.getElementById('nomeAlvoExclusao').innerText = c.nome;
 
+    const modal = document.getElementById('modalExclusaoPermanente');
+    const conteudo = document.getElementById('conteudoModalExclusao');
+    modal.classList.remove('hidden');
+    setTimeout(() => { modal.classList.remove('opacity-0'); conteudo.classList.remove('opacity-0', 'scale-95'); conteudo.classList.add('scale-100'); }, 10);
+}
+
+function fecharModal(id) {
+    const modal = document.getElementById(id);
+    const conteudo = modal.querySelector('div');
     modal.classList.add('opacity-0');
-    if (conteudoModal) {
-        conteudoModal.classList.remove('scale-100');
-        conteudoModal.classList.add('opacity-0', 'scale-95');
-    }
+    if (conteudo) { conteudo.classList.remove('scale-100'); conteudo.classList.add('opacity-0', 'scale-95'); }
     setTimeout(() => modal.classList.add('hidden'), 300);
 }
 
 function processarEnvioFormulario(e) {
     e.preventDefault();
     const id = document.getElementById('colaboradorId').value;
-
-    const novosDados = {
+    const novo = {
         id: id ? parseInt(id) : Date.now(),
         nome: document.getElementById('colabNome').value,
         matricula: document.getElementById('colabMatricula').value,
@@ -369,30 +354,24 @@ function processarEnvioFormulario(e) {
         dataAdmissao: document.getElementById('colabDataAdmissao').value,
         cargo: document.getElementById('colabCargo').value,
         statusCracha: document.getElementById('colabCracha').value,
+        situacao: document.getElementById('colabSituacao').value,
         registraPonto: document.getElementById('colabRegistraPonto').checked,
-        ativo: true, // Novos criados sempre ativos
         assinaturas: id ? (colaboradores.find(x => x.id == id).assinaturas || {}) : {}
     };
 
-    if (id) {
-        // Ao editar, mantemos o status 'ativo' original
-        const original = colaboradores.find(c => c.id == id);
-        novosDados.ativo = original.ativo;
-        colaboradores = colaboradores.map(c => c.id == id ? novosDados : c);
-    } else {
-        colaboradores.push(novosDados);
-    }
+    if (id) colaboradores = colaboradores.map(c => c.id == id ? novo : c);
+    else colaboradores.push(novo);
+
     salvarNoArmazenamento();
     fecharModal('modalFormulario');
     renderizarApp();
 }
 
-// Função que muda o status em vez de deletar
 function confirmarAlteracaoStatus() {
     const id = parseInt(document.getElementById('idAlvoDesligamento').value);
     colaboradores = colaboradores.map(c => {
         if (c.id === id) {
-            return { ...c, ativo: !c.ativo }; // Inverte o status (Ativo <-> Desligado)
+            return { ...c, situacao: c.situacao === 'Desligado' ? 'Ativo' : 'Desligado' };
         }
         return c;
     });
@@ -401,89 +380,52 @@ function confirmarAlteracaoStatus() {
     renderizarApp();
 }
 
-/* --- IMPORTAÇÃO E EXPORTAÇÃO --- */
+function confirmarExclusaoPermanente() {
+    const id = parseInt(document.getElementById('idAlvoExclusao').value);
+    // Remove o colaborador do array defenitivamente (Hard Delete)
+    colaboradores = colaboradores.filter(c => c.id !== id);
+    salvarNoArmazenamento();
+    fecharModal('modalExclusaoPermanente');
+    renderizarApp();
+}
 
+// --- 9. IMPORTAÇÃO E EXPORTAÇÃO ---
 function exportarJSON() {
-    const dadosStr = JSON.stringify(colaboradores, null, 2);
-    const blob = new Blob([dadosStr], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `rh-conecta-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(colaboradores, null, 2)], { type: 'application/json' }));
+    a.download = `rh-dados-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
 }
 
 function exportarCSV() {
-    const cabecalhoMes = `Assinou Ponto (${estadoApp.mesAtual})`;
-    // Adicionado coluna Situação
-    const cabecalhos = ["Nome", "Matricula", "Filial", "Data Admissao", "Cargo", "Status Cracha", "Registra Ponto", "Situacao", cabecalhoMes];
-
-    const conteudoCSV = colaboradores.map(c => {
-        let statusAssinatura = "N/A";
-        if (c.registraPonto) {
-            statusAssinatura = c.assinaturas[estadoApp.mesAtual] ? "Sim" : "Não";
-        }
-
-        const situacaoTexto = c.ativo ? "Ativo" : "Desligado";
-
-        return [
-            `"${c.nome}"`,
-            `"${c.matricula}"`,
-            `"${c.filial}"`,
-            c.dataAdmissao,
-            `"${c.cargo}"`,
-            `"${c.statusCracha}"`,
-            c.registraPonto ? "Sim" : "Não",
-            `"${situacaoTexto}"`, // Nova coluna no CSV
-            `"${statusAssinatura}"`
-        ].join(',');
-    });
-
-    const stringCSV = [cabecalhos.join(','), ...conteudoCSV].join('\n');
-    const blob = new Blob(['\uFEFF' + stringCSV], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `rh-conecta-export-${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const cabecalho = ["Nome", "Matricula", "Filial", "Admissao", "Cargo", "Cracha", "Ponto?", "Situacao", `Assinou (${estadoApp.mesAtual})`];
+    const linhas = colaboradores.map(c => [
+        `"${c.nome}"`, `"${c.matricula}"`, `"${c.filial}"`, c.dataAdmissao, `"${c.cargo}"`, `"${c.statusCracha}"`,
+        c.registraPonto ? "Sim" : "Não", `"${c.situacao}"`,
+        c.registraPonto ? (c.assinaturas[estadoApp.mesAtual] ? "Sim" : "Não") : "N/A"
+    ].join(','));
+    const blob = new Blob(['\uFEFF' + [cabecalho.join(','), ...linhas].join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `rh-planilha-${estadoApp.mesAtual}.csv`;
+    a.click();
 }
 
-function acionarImportacao() {
-    document.getElementById('inputArquivo').click();
-}
-
-function processarImportacaoArquivo(evento) {
-    const arquivo = evento.target.files[0];
-    if (!arquivo) return;
-    const leitor = new FileReader();
-    leitor.onload = (e) => {
+function acionarImportacao() { document.getElementById('inputArquivo').click(); }
+function processarImportacaoArquivo(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
         try {
-            const dadosImportados = JSON.parse(e.target.result);
-            if (Array.isArray(dadosImportados)) {
-                if (confirm(`Importar ${dadosImportados.length} registros e substituir os dados atuais?`)) {
-                    colaboradores = dadosImportados.map(d => ({
-                        id: d.id,
-                        nome: d.nome || d.name,
-                        matricula: d.matricula,
-                        filial: d.filial || d.branch,
-                        dataAdmissao: d.dataAdmissao || d.admissionDate,
-                        cargo: d.cargo || d.role,
-                        statusCracha: d.statusCracha || d.badgeStatus,
-                        registraPonto: d.registraPonto !== undefined ? d.registraPonto : d.registersPoint,
-                        // Garante que campo ativo exista ao importar backups antigos
-                        ativo: d.ativo !== undefined ? d.ativo : true,
-                        assinaturas: d.assinaturas || d.signatures || {}
-                    }));
-                    salvarNoArmazenamento();
-                    renderizarApp();
-                }
-            } else { alert('Arquivo inválido.'); }
-        } catch (erro) { alert('Erro na leitura do JSON.'); }
+            const dados = JSON.parse(ev.target.result);
+            if (Array.isArray(dados) && confirm(`Importar ${dados.length} registos? Isso substituirá os dados atuais.`)) {
+                colaboradores = dados;
+                salvarNoArmazenamento();
+                renderizarApp();
+            }
+        } catch (err) { alert('Erro ao importar ficheiro.'); }
     };
-    leitor.readAsText(arquivo);
-    evento.target.value = '';
+    reader.readAsText(file);
+    e.target.value = '';
 }
