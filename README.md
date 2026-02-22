@@ -1,16 +1,20 @@
 # 🚀 RH Conecta - Gestão Inteligente de Colaboradores
 
-O **RH Conecta** é uma aplicação web *Single Page Application* (SPA) desenvolvida para facilitar a gestão de colaboradores e o controle de assinaturas de ponto em empresas com múltiplas filiais. O sistema foca em simplicidade, eficiência e portabilidade, funcionando inteiramente no navegador sem necessidade de instalação de banco de dados complexos.
+O **RH Conecta** é uma aplicação web *Single Page Application* (SPA) desenvolvida para facilitar a gestão de colaboradores e o controle de assinaturas de ponto em empresas com múltiplas filiais. O sistema foca em uma experiência de usuário (UX) premium, eficiência e portabilidade, funcionando inteiramente no navegador sem a necessidade de instalação de banco de dados complexos.
 
 ## 📖 Sobre o Projeto
 
 Este projeto foi criado para resolver a necessidade de gerenciar o quadro de funcionários de 4 filiais específicas (FL 02, FL 03, FL 53, FL 54). Ele permite o cadastro completo de colaboradores, controle de status de crachá e um acompanhamento mensal de assinaturas de espelho de ponto.
+
+Nesta versão mais recente, a aplicação recebeu um redesign completo focado em usabilidade moderna, adotando o estilo Glassmorphism (vidro fosco), suporte nativo a Modo Escuro (Dark Mode) e uma arquitetura de arquivos modular e organizada.
 
 ## ✨ Funcionalidades
 
 ### 👥 Gestão de Colaboradores
 
 * **CRUD Completo:** Adicionar, Editar e Visualizar colaboradores.
+
+* **Múltiplos Status de Crachá:** Definitivo, Provisório, Sem Crachá, Crachá Quebrado e Outra Via.
 
 * **Desligamento Lógico (Soft Delete):** Colaboradores podem ser marcados como "Desligados" sem perder o histórico, podendo ser reativados posteriormente.
 
@@ -28,6 +32,16 @@ Este projeto foi criado para resolver a necessidade de gerenciar o quadro de fun
 
 * **Barra de Progresso:** Acompanhamento visual da porcentagem de conclusão do mês.
 
+### 🎨 UI/UX Premium (Novo)
+
+* **Modo Claro / Escuro:** Alternância de tema com salvamento automático de preferência do usuário e detecção do tema do sistema.
+
+* **Design Moderno:** Utilização de Glassmorphism, sombras suaves, bordas arredondadas e micro-interações.
+
+* **Interface Adaptável:** Design responsivo que funciona perfeitamente em Desktops, Tablets e Celulares, incluindo um menu lateral estilo gaveta no mobile.
+
+* **Scrollbars Personalizadas:** Barras de rolagem customizadas que se adaptam ao tema escolhido.
+
 ### 💾 Persistência e Dados
 
 * **LocalStorage:** Os dados são salvos automaticamente no navegador do usuário.
@@ -36,11 +50,9 @@ Este projeto foi criado para resolver a necessidade de gerenciar o quadro de fun
 
 * **Exportação CSV (Excel):** Relatórios detalhados compatíveis com Excel/Google Sheets, incluindo status de assinatura do mês selecionado.
 
-* **Importação:** Restauração de backups via arquivo JSON.
+* **Importação Segura:** Restauração de backups via arquivo JSON.
 
 ### 📱 Interface
-
-* **Design Responsivo:** Funciona perfeitamente em Desktops, Tablets e Celulares.
 
 * **Sidebar Adaptável:** Menu lateral que se transforma em menu "gaveta" no mobile.
 
