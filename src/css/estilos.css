@@ -1,84 +1,52 @@
 :root {
-    /* --- FONTE --- */
+    /* --- CONFIGURAÇÕES VISUAIS --- */
     --fonte-site: 'Inter', sans-serif;
-
-    /* --- ESTRUTURA E CORES --- */
     --pagina-fundo: #f8fafc;
-    /* (Slate-50) */
     --conteudo-fundo: #ffffff;
-    /* (White) */
     --cor-escura: #0f172a;
-    /* (Slate-900) */
-
-    /* --- BORDAS E DIVISÓRIAS --- */
     --borda-suave: #e2e8f0;
-    /* (Slate-200) */
     --borda-forte: #cbd5e1;
-    /* (Slate-300) */
-
-    /* --- TEXTOS (HIERARQUIA) --- */
     --texto-forte: #1e293b;
-    /* (Slate-800) */
     --texto-principal: #475569;
-    /* (Slate-600) */
     --texto-secundario: #64748b;
-    /* (Slate-500) */
     --texto-inativo: #94a3b8;
-    /* (Slate-400) */
 
-    /* --- IDENTIDADE VISUAL (MARCA) --- */
+    /* Cores da Marca */
     --marca-cor: #4f46e5;
-    /* (Indigo-600) */
     --marca-hover: #4338ca;
-    /* (Indigo-700) */
     --marca-claro: #6366f1;
-    /* (Indigo-500) */
     --marca-fundo: #eef2ff;
-    /* (Indigo-50) */
     --marca-borda: #c7d2fe;
-    /* (Indigo-200) */
 
-    /* --- SISTEMA DE STATUS --- */
+    /* Status */
     --sucesso-bg: #ecfdf5;
-    /* Emerald-50 */
     --sucesso-txt: #047857;
-    /* Emerald-700 */
     --erro-bg: #fff1f2;
-    /* Rose-50 */
     --erro-txt: #be123c;
-    /* Rose-700 */
     --alerta-bg: #fffbeb;
-    /* Amber-50 */
     --alerta-txt: #b45309;
-    /* Amber-700 */
+    --roxo-bg: #f5f3ff;
+    --roxo-txt: #6d28d9;
+    --laranja-bg: #fff7ed;
+    --laranja-txt: #c2410c;
     --neutro-bg: #f1f5f9;
-    /* Slate-100 (Desligado) */
-    --neutro-txt: #64748b;
-    /* Slate-500 (Desligado) */
 
-    /* --- UX E INTERAÇÃO --- */
+    /* UX */
     --velocidade-animacao: 300ms;
     --curva-suave: cubic-bezier(0.2, 0.8, 0.2, 1);
-    --sombra-card: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-
-    /* Cores Sociais */
-    --social-insta: #E1306C;
-    --social-github: #333333;
-    --social-linkedin: #0077b5;
+    --sombra-card: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
-/* --- CSS GLOBAL --- */
 body {
     font-family: var(--fonte-site);
-    background-color: var(--pagina-fundo);
-    color: var(--texto-principal);
+    -webkit-font-smoothing: antialiased;
 }
 
 .scroll-smooth-touch {
     -webkit-overflow-scrolling: touch;
 }
 
-/* Scrollbar Sincronizada */
+/* Scrollbar Personalizada */
 ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -97,7 +65,17 @@ body {
     background: var(--texto-inativo);
 }
 
-/* Animações (Usadas apenas na carga inicial estática) */
+/* Scrollbar Modo Escuro */
+html.dark ::-webkit-scrollbar-thumb {
+    background: #334155;
+    /* slate-700 */
+}
+
+html.dark ::-webkit-scrollbar-thumb:hover {
+    background: #475569;
+    /* slate-600 */
+}
+
 @keyframes fadeIn {
     from {
         opacity: 0;
@@ -129,57 +107,37 @@ body {
     animation: slideUpFade var(--velocidade-animacao) var(--curva-suave) forwards;
 }
 
-/* Menu Ativo */
 .sidebar-link.active {
     background-color: rgba(255, 255, 255, 0.1);
     border-left: 3px solid var(--marca-claro);
     color: #ffffff;
 }
 
-/* Linha de Colaborador Desligado */
+/* Tratamento de Situações (Claro e Escuro) */
 .row-desligado {
     background-color: #f8fafc;
-    opacity: 0.75;
-    filter: grayscale(0.8);
+    opacity: 0.6;
+    filter: grayscale(1);
 }
 
-/* Interações (Hover apenas se tiver mouse) */
+.dark .row-desligado {
+    background-color: #0f172a;
+    /* slate-900 deeper */
+    opacity: 0.5;
+}
+
+.row-afastado {
+    background-color: #fffbeb;
+}
+
+.dark .row-afastado {
+    background-color: rgba(69, 26, 3, 0.2);
+    /* very dark amber for dark mode */
+}
+
 @media (hover: hover) {
     .btn-hover:hover {
         transform: translateY(-2px);
-        box-shadow: var(--sombra-card);
-    }
-
-    /* Hover simples na linha, sem transformações pesadas que causam repaint */
-    .row-hover:hover {
-        background-color: var(--marca-fundo);
-        z-index: 10;
-        position: relative;
-    }
-
-    .row-desligado:hover {
-        filter: grayscale(0);
-        opacity: 1;
-        background-color: #f1f5f9;
-    }
-
-    .social-icon:hover {
-        transform: translateY(-3px);
-    }
-
-    .social-insta:hover {
-        color: var(--social-insta);
-        filter: drop-shadow(0 0 8px rgba(225, 48, 108, 0.4));
-    }
-
-    .social-github:hover {
-        color: var(--social-github);
-        filter: drop-shadow(0 0 8px rgba(0, 0, 0, 0.3));
-    }
-
-    .social-linkedin:hover {
-        color: var(--social-linkedin);
-        filter: drop-shadow(0 0 8px rgba(0, 119, 181, 0.4));
     }
 }
 
